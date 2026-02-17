@@ -111,6 +111,7 @@ export default function ItemsScreen({ navigation }) {
                 data={items}
                 keyExtractor={(item) => String(item.id)}
                 contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 120 }}
+                style={{ flex: 1 }}
                 ListEmptyComponent={
                     <View style={styles.emptyBox}>
                         <Ionicons name="cube-outline" size={48} color={colors.textMuted} />

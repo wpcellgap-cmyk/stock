@@ -27,7 +27,7 @@ export default function ItemFormScreen({ navigation, route }) {
     const [buyPrice, setBuyPrice] = useState('');
     const [sellPrice, setSellPrice] = useState('');
     const [quantity, setQuantity] = useState('');
-    const [minStock, setMinStock] = useState('5');
+    const [minStock, setMinStock] = useState('1');
     const [description, setDescription] = useState('');
     const [categories, setCategories] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -53,7 +53,7 @@ export default function ItemFormScreen({ navigation, route }) {
             setBuyPrice(String(item.buy_price || ''));
             setSellPrice(String(item.sell_price || ''));
             setQuantity(String(item.quantity || ''));
-            setMinStock(String(item.min_stock || '5'));
+            setMinStock(String(item.min_stock || '1'));
             setDescription(item.description || '');
         }
     };
@@ -73,7 +73,7 @@ export default function ItemFormScreen({ navigation, route }) {
                 buy_price: parseFloat(buyPrice) || 0,
                 sell_price: parseFloat(sellPrice) || 0,
                 quantity: parseInt(quantity) || 0,
-                min_stock: parseInt(minStock) || 5,
+                min_stock: parseInt(minStock) || 1,
                 description: description.trim(),
             };
             if (isEdit) {
@@ -221,7 +221,7 @@ export default function ItemFormScreen({ navigation, route }) {
                             {renderInput('Jumlah Stok', quantity, setQuantity, { placeholder: '0', keyboardType: 'numeric' })}
                         </View>
                         <View style={{ flex: 1, marginLeft: 8 }}>
-                            {renderInput('Minimum Stok', minStock, setMinStock, { placeholder: '5', keyboardType: 'numeric' })}
+                            {renderInput('Minimum Stok', minStock, setMinStock, { placeholder: '1', keyboardType: 'numeric' })}
                         </View>
                     </View>
                     {renderInput('Keterangan', description, setDescription, { placeholder: 'Catatan...', multiline: true, numberOfLines: 3 })}

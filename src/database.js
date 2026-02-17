@@ -28,7 +28,7 @@ async function initDatabase(database) {
       category_id INTEGER,
       price REAL DEFAULT 0,
       quantity INTEGER DEFAULT 0,
-      min_stock INTEGER DEFAULT 5,
+      min_stock INTEGER DEFAULT 1,
       description TEXT,
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime')),
@@ -172,7 +172,7 @@ export async function addItem(item) {
     const database = await getDatabase();
     const result = await database.runAsync(
         'INSERT INTO items (name, sku, category_id, price, buy_price, sell_price, quantity, min_stock, description, custom_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [item.name, item.sku || null, item.category_id || null, item.sell_price || 0, item.buy_price || 0, item.sell_price || 0, item.quantity || 0, item.min_stock || 5, item.description || '', item.custom_id || null]
+        [item.name, item.sku || null, item.category_id || null, item.sell_price || 0, item.buy_price || 0, item.sell_price || 0, item.quantity || 0, item.min_stock || 1, item.description || '', item.custom_id || null]
     );
     await logActivity(result.lastInsertRowId, 'stock_in', item.quantity || 0, 'Item baru ditambahkan');
     return result.lastInsertRowId;
@@ -183,7 +183,7 @@ export async function updateItem(id, item) {
     const old = await database.getFirstAsync('SELECT quantity FROM items WHERE id = ?', [id]);
     await database.runAsync(
         'UPDATE items SET name = ?, sku = ?, category_id = ?, price = ?, buy_price = ?, sell_price = ?, quantity = ?, min_stock = ?, description = ?, custom_id = ?, updated_at = datetime("now","localtime") WHERE id = ?',
-        [item.name, item.sku || null, item.category_id || null, item.sell_price || 0, item.buy_price || 0, item.sell_price || 0, item.quantity || 0, item.min_stock || 5, item.description || '', item.custom_id || null, id]
+        [item.name, item.sku || null, item.category_id || null, item.sell_price || 0, item.buy_price || 0, item.sell_price || 0, item.quantity || 0, item.min_stock || 1, item.description || '', item.custom_id || null, id]
     );
     const diff = (item.quantity || 0) - (old?.quantity || 0);
     if (diff !== 0) {
@@ -253,10 +253,24 @@ export async function bulkInsertItems(rows) {
         if (!row.name || !row.name.trim()) { skipped++; continue; }
 
         // Resolve category
+        // Resolve category (create if not exists)
         let catId = null;
         if (row.category) {
-            const cat = await database.getFirstAsync('SELECT id FROM categories WHERE LOWER(name) = LOWER(?)', [row.category]);
-            if (cat) catId = cat.id;
+            let catName = row.category.trim();
+
+            // Normalize aliases
+            if (catName.toLowerCase() === 'batre' || catName.toLowerCase() === 'battery') {
+                catName = 'Baterai';
+            }
+
+            const cat = await database.getFirstAsync('SELECT id FROM categories WHERE LOWER(name) = LOWER(?)', [catName]);
+            if (cat) {
+                catId = cat.id;
+            } else {
+                // Create new category
+                const result = await database.runAsync('INSERT INTO categories (name, icon) VALUES (?, ?)', [catName, 'cube-outline']);
+                catId = result.lastInsertRowId;
+            }
         }
 
         const itemName = row.name.trim();
@@ -284,7 +298,7 @@ export async function bulkInsertItems(rows) {
             // Insert new item
             await database.runAsync(
                 'INSERT INTO items (name, sku, category_id, price, buy_price, sell_price, quantity, min_stock, description, custom_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [itemName, row.sku || null, catId, sellPrice, buyPrice, sellPrice, qty, parseInt(row.min_stock) || 5, row.description || '', row.custom_id || null]
+                [itemName, row.sku || null, catId, sellPrice, buyPrice, sellPrice, qty, parseInt(row.min_stock) || 1, row.description || '', row.custom_id || null]
             );
             inserted++;
         }

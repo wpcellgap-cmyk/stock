@@ -16,6 +16,7 @@ import ItemFormScreen from './src/screens/ItemFormScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import TransactionScreen from './src/screens/TransactionScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -72,6 +73,7 @@ function TabNavigator() {
                     let iconName;
                     switch (route.name) {
                         case 'Dashboard': iconName = focused ? 'grid' : 'grid-outline'; break;
+                        case 'Transactions': iconName = focused ? 'swap-horizontal' : 'swap-horizontal-outline'; break;
                         case 'Items': iconName = focused ? 'cube' : 'cube-outline'; break;
                         case 'Categories': iconName = focused ? 'folder' : 'folder-outline'; break;
                         case 'Reports': iconName = focused ? 'bar-chart' : 'bar-chart-outline'; break;
@@ -83,10 +85,8 @@ function TabNavigator() {
             })}
         >
             <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Beranda' }} />
+            <Tab.Screen name="Transactions" component={TransactionScreen} options={{ tabBarLabel: 'Transaksi' }} />
             <Tab.Screen name="Items" component={ItemsScreen} options={{ tabBarLabel: 'Inventaris' }} />
-            <Tab.Screen name="Categories" component={CategoriesScreen} options={{ tabBarLabel: 'Kategori' }} />
-            <Tab.Screen name="Reports" component={ReportsScreen} options={{ tabBarLabel: 'Laporan' }} />
-            <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Pengaturan' }} />
         </Tab.Navigator>
     );
 }
@@ -98,11 +98,10 @@ function AppContent() {
             <StatusBar style={isDark ? 'light' : 'dark'} />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main" component={TabNavigator} />
-                <Stack.Screen
-                    name="ItemForm"
-                    component={ItemFormScreen}
-                    options={{ animation: 'slide_from_right' }}
-                />
+                <Stack.Screen name="ItemForm" component={ItemFormScreen} options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="Categories" component={CategoriesScreen} options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="Reports" component={ReportsScreen} options={{ animation: 'slide_from_right' }} />
+                <Stack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
             </Stack.Navigator>
         </NavigationContainer>
     );

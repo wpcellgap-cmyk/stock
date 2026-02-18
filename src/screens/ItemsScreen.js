@@ -26,6 +26,15 @@ export default function ItemsScreen({ navigation }) {
     const [selectedCat, setSelectedCat] = useState(null);
     const [showScanner, setShowScanner] = useState(false);
 
+    // Handle route params for initial filter
+    React.useEffect(() => {
+        if (navigation.getState().routes[navigation.getState().index].params?.filter) {
+            setFilter(navigation.getState().routes[navigation.getState().index].params.filter);
+            // Clear params to avoid getting stuck on this filter when navigating back
+            navigation.setParams({ filter: undefined });
+        }
+    }, [navigation.getState().routes[navigation.getState().index].params]);
+
     const loadData = useCallback(async () => {
         try {
             const data = await getItems(search, filter, selectedCat);
@@ -50,7 +59,15 @@ export default function ItemsScreen({ navigation }) {
 
     return (
         <View style={styles.screen}>
-            <GradientHeader title="Inventaris" subtitle={`${items.length} item`} />
+            <GradientHeader
+                title="Inventaris"
+                subtitle={`${items.length} item`}
+                rightContent={
+                    <TouchableOpacity onPress={() => navigation.navigate('Categories')} style={{ marginTop: 4 }}>
+                        <Ionicons name="folder-open-outline" size={24} color="white" />
+                    </TouchableOpacity>
+                }
+            />
 
             {/* Search */}
             <View style={styles.searchBox}>

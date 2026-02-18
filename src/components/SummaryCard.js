@@ -29,7 +29,7 @@ const getStyles = (colors) => StyleSheet.create({
         paddingVertical: 4,
         paddingHorizontal: Spacing.sm,
         alignItems: 'center',
-        width: '47%',
+        width: '100%',
         marginBottom: Spacing.xs,
     },
     iconBox: {
@@ -41,12 +41,13 @@ const getStyles = (colors) => StyleSheet.create({
         marginBottom: 2,
     },
     value: {
-        fontSize: FontSize.xxl,
+        fontSize: FontSize.xxxl,
         fontWeight: '800',
         color: colors.textPrimary,
     },
     label: {
-        fontSize: FontSize.xs,
+        fontSize: FontSize.sm,
+        fontWeight: '600',
         color: colors.textSecondary,
         marginTop: 0,
         textAlign: 'center',

@@ -78,22 +78,22 @@ const getStyles = (colors) => StyleSheet.create({
     },
     content: { flex: 1 },
     label: {
-        fontSize: FontSize.sm,
+        fontSize: FontSize.md,
         fontWeight: '700',
         color: colors.textPrimary,
     },
     note: {
-        fontSize: FontSize.xs,
+        fontSize: FontSize.sm,
         color: colors.textSecondary,
         marginTop: 2,
     },
     right: { alignItems: 'flex-end' },
     qty: {
-        fontSize: FontSize.md,
+        fontSize: FontSize.lg,
         fontWeight: '800',
     },
     time: {
-        fontSize: FontSize.xs,
+        fontSize: FontSize.sm,
         color: colors.textMuted,
         marginTop: 2,
     },

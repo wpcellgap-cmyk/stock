@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import GradientHeader from '../components/GradientHeader';
-import { getCategories, getCategoryItemCounts, addCategory, deleteCategory } from '../database';
+import { getCategories, getCategoryItemCounts, addCategory, deleteCategory, reorderCategory } from '../database';
 import { useTheme } from '../ThemeContext';
 import { FontSize, Spacing, BorderRadius, Shadow } from '../theme';
 
@@ -65,9 +65,21 @@ export default function CategoriesScreen({ navigation }) {
         );
     };
 
+    const handleMoveUp = async (index) => {
+        if (index <= 0) return;
+        await reorderCategory(categories, index, index - 1);
+        loadData();
+    };
+
+    const handleMoveDown = async (index) => {
+        if (index >= categories.length - 1) return;
+        await reorderCategory(categories, index, index + 1);
+        loadData();
+    };
+
     const styles = getStyles(colors);
 
-    const renderCategory = ({ item: cat }) => (
+    const renderCategory = ({ item: cat, index }) => (
         <View style={[styles.catCard, Shadow.light]}>
             <View style={[styles.catIcon, { backgroundColor: colors.accent + '22' }]}>
                 <Ionicons name={cat.icon || 'cube-outline'} size={22} color={colors.accent} />
@@ -75,6 +87,22 @@ export default function CategoriesScreen({ navigation }) {
             <View style={styles.catInfo}>
                 <Text style={styles.catName}>{cat.name}</Text>
                 <Text style={styles.catCount}>{counts[cat.id] || 0} item</Text>
+            </View>
+            <View style={styles.reorderBtns}>
+                <TouchableOpacity
+                    onPress={() => handleMoveUp(index)}
+                    style={[styles.reorderBtn, index === 0 && styles.reorderBtnDisabled]}
+                    disabled={index === 0}
+                >
+                    <Ionicons name="chevron-up" size={20} color={index === 0 ? colors.textMuted : colors.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => handleMoveDown(index)}
+                    style={[styles.reorderBtn, index === categories.length - 1 && styles.reorderBtnDisabled]}
+                    disabled={index === categories.length - 1}
+                >
+                    <Ionicons name="chevron-down" size={20} color={index === categories.length - 1 ? colors.textMuted : colors.accent} />
+                </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={() => handleDelete(cat)} style={styles.deleteBtn}>
                 <Ionicons name="trash-outline" size={18} color={colors.danger} />
@@ -175,7 +203,18 @@ const getStyles = (colors) => StyleSheet.create({
     catInfo: { flex: 1 },
     catName: { fontSize: FontSize.lg, fontWeight: '700', color: colors.textPrimary },
     catCount: { fontSize: FontSize.xs, color: colors.textSecondary, marginTop: 2 },
-    deleteBtn: { padding: 8 },
+    deleteBtn: { padding: 8, marginLeft: 4 },
+    reorderBtns: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        marginRight: 4,
+    },
+    reorderBtn: {
+        padding: 2,
+    },
+    reorderBtnDisabled: {
+        opacity: 0.3,
+    },
     emptyBox: { alignItems: 'center', paddingTop: 60 },
     emptyText: { color: colors.textMuted, marginTop: Spacing.md, fontSize: FontSize.md },
     fab: {

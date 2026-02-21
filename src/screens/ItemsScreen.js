@@ -1,6 +1,6 @@
 // src/screens/ItemsScreen.js
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import GradientHeader from '../components/GradientHeader';
@@ -91,7 +91,12 @@ export default function ItemsScreen({ navigation }) {
             </View>
 
             {/* Filter chips */}
-            <View style={styles.filtersRow}>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.filtersRow}
+                contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}
+            >
                 {FILTERS.map((f) => (
                     <TouchableOpacity
                         key={f.key}
@@ -101,7 +106,7 @@ export default function ItemsScreen({ navigation }) {
                         <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>{f.label}</Text>
                     </TouchableOpacity>
                 ))}
-            </View>
+            </ScrollView>
 
             {/* Category quick filter */}
             <FlatList
@@ -181,10 +186,8 @@ const getStyles = (colors) => StyleSheet.create({
         fontSize: FontSize.md,
     },
     filtersRow: {
-        flexDirection: 'row',
-        paddingHorizontal: Spacing.lg,
         marginTop: Spacing.md,
-        gap: Spacing.sm,
+        maxHeight: 44,
     },
     chip: {
         paddingHorizontal: 14,

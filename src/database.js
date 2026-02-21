@@ -56,6 +56,14 @@ async function initDatabase(database) {
     // Migrate old price data to sell_price (one-time)
     await database.runAsync('UPDATE items SET sell_price = price WHERE sell_price = 0 AND price > 0').catch(() => { });
 
+    // Migration: Add sort_order column to categories
+    await database.runAsync('ALTER TABLE categories ADD COLUMN sort_order INTEGER DEFAULT 0').catch(() => { });
+    // Initialize sort_order for existing categories that have 0
+    const unsorted = await database.getAllAsync('SELECT id FROM categories WHERE sort_order = 0 ORDER BY name');
+    for (let i = 0; i < unsorted.length; i++) {
+        await database.runAsync('UPDATE categories SET sort_order = ? WHERE id = ?', [i + 1, unsorted[i].id]);
+    }
+
     // Seed default categories if empty
     const row = await database.getFirstAsync('SELECT COUNT(*) as count FROM categories');
     if (row.count === 0) {
@@ -80,12 +88,14 @@ async function initDatabase(database) {
 // ─── Category CRUD ─────────────────────────────────
 export async function getCategories() {
     const database = await getDatabase();
-    return database.getAllAsync('SELECT * FROM categories ORDER BY name');
+    return database.getAllAsync('SELECT * FROM categories ORDER BY sort_order ASC, name ASC');
 }
 
 export async function addCategory(name, icon = 'cube-outline') {
     const database = await getDatabase();
-    const result = await database.runAsync('INSERT INTO categories (name, icon) VALUES (?, ?)', [name, icon]);
+    const maxRow = await database.getFirstAsync('SELECT COALESCE(MAX(sort_order), 0) as max_order FROM categories');
+    const nextOrder = (maxRow?.max_order || 0) + 1;
+    const result = await database.runAsync('INSERT INTO categories (name, icon, sort_order) VALUES (?, ?, ?)', [name, icon, nextOrder]);
     return result.lastInsertRowId;
 }
 
@@ -108,6 +118,18 @@ export async function getCategoryItemCounts() {
     const map = {};
     rows.forEach(r => { map[r.category_id] = r.count; });
     return map;
+}
+
+export async function reorderCategory(categories, fromIndex, toIndex) {
+    if (toIndex < 0 || toIndex >= categories.length) return;
+    const database = await getDatabase();
+    const itemA = categories[fromIndex];
+    const itemB = categories[toIndex];
+    // Swap sort_order values
+    const orderA = itemA.sort_order;
+    const orderB = itemB.sort_order;
+    await database.runAsync('UPDATE categories SET sort_order = ? WHERE id = ?', [orderB, itemA.id]);
+    await database.runAsync('UPDATE categories SET sort_order = ? WHERE id = ?', [orderA, itemB.id]);
 }
 
 // ─── Item CRUD ──────────────────────────────────────

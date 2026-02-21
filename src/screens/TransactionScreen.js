@@ -24,6 +24,22 @@ export default function TransactionScreen({ navigation }) {
 
     // Shopping List State
     const [shoppingList, setShoppingList] = useState([]);
+    const [listLoaded, setListLoaded] = useState(false);
+
+    // Load shopping list from AsyncStorage on mount
+    useEffect(() => {
+        AsyncStorage.getItem('@shopping_list').then(data => {
+            if (data) setShoppingList(JSON.parse(data));
+            setListLoaded(true);
+        });
+    }, []);
+
+    // Save shopping list to AsyncStorage whenever it changes
+    useEffect(() => {
+        if (listLoaded) {
+            AsyncStorage.setItem('@shopping_list', JSON.stringify(shoppingList));
+        }
+    }, [shoppingList, listLoaded]);
 
     const loadItems = async () => {
         const data = await getItems(search, 'all');

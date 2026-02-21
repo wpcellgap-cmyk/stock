@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
-import { getItemById, addItem, updateItem, getCategories, findItemByName, addStockToItem } from '../database';
+import { getItemById, addItem, updateItem, getCategories, findItemByName, addStockToItem, getItems } from '../database';
 import { useTheme } from '../ThemeContext';
 import { FontSize, Spacing, BorderRadius, Shadow } from '../theme';
 
@@ -32,11 +32,37 @@ export default function ItemFormScreen({ navigation, route }) {
     const [categories, setCategories] = useState([]);
     const [saving, setSaving] = useState(false);
     const [showScanner, setShowScanner] = useState(false);
+    const [scanTarget, setScanTarget] = useState('sku'); // 'sku' or 'customId'
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     useEffect(() => {
         loadCategories();
         if (editId) loadItem();
     }, []);
+
+    // Live search for similar items when typing name
+    useEffect(() => {
+        if (isEdit || name.trim().length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const results = await getItems(name.trim(), 'all');
+                // Exclude current item if editing
+                const filtered = editId
+                    ? results.filter(i => i.id !== editId)
+                    : results;
+                setSuggestions(filtered.slice(0, 5));
+                setShowSuggestions(filtered.length > 0);
+            } catch (e) {
+                setSuggestions([]);
+            }
+        }, 400); // 400ms debounce
+        return () => clearTimeout(timer);
+    }, [name]);
 
     const loadCategories = async () => {
         const cats = await getCategories();
@@ -161,9 +187,66 @@ export default function ItemFormScreen({ navigation, route }) {
                     contentContainerStyle={styles.form}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {renderInput('Nama Item *', name, setName, { placeholder: 'Contoh: Tombol Luar iPhone 12' })}
+                    {/* Nama Item with live suggestions */}
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Nama Item *</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={name}
+                            onChangeText={setName}
+                            placeholder="Contoh: Tombol Luar iPhone 12"
+                            placeholderTextColor={colors.textMuted}
+                        />
+                        {showSuggestions && suggestions.length > 0 && (
+                            <View style={styles.suggestionsBox}>
+                                <View style={styles.suggestionsHeader}>
+                                    <Ionicons name="alert-circle" size={16} color={colors.warning || '#f59e0b'} />
+                                    <Text style={styles.suggestionsTitle}>Item mirip ditemukan:</Text>
+                                    <TouchableOpacity onPress={() => setShowSuggestions(false)}>
+                                        <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                                    </TouchableOpacity>
+                                </View>
+                                {suggestions.map((item) => (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        style={styles.suggestionItem}
+                                        onPress={() => {
+                                            setName(item.name);
+                                            setShowSuggestions(false);
+                                        }}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.suggestionName}>{item.name}</Text>
+                                            <Text style={styles.suggestionInfo}>
+                                                Stok: {item.quantity} {item.category_name ? `• ${item.category_name}` : ''}
+                                            </Text>
+                                        </View>
+                                        <Ionicons name="open-outline" size={16} color={colors.accent} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
 
-                    {renderInput('ID Barang (Opsional)', customId, setCustomId, { placeholder: 'Contoh: A001' })}
+                    {/* ID Barang Input with Scan Button */}
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>ID Barang (Opsional)</Text>
+                        <View style={styles.inputWithIcon}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                                value={customId}
+                                onChangeText={setCustomId}
+                                placeholder="Contoh: A001"
+                                placeholderTextColor={colors.textMuted}
+                            />
+                            <TouchableOpacity
+                                style={styles.scanBtn}
+                                onPress={() => { setScanTarget('customId'); setShowScanner(true); }}
+                            >
+                                <Ionicons name="scan" size={20} color={colors.white} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
                     {/* SKU Input with Scan Button */}
                     <View style={styles.inputGroup}>
@@ -178,7 +261,7 @@ export default function ItemFormScreen({ navigation, route }) {
                             />
                             <TouchableOpacity
                                 style={styles.scanBtn}
-                                onPress={() => setShowScanner(true)}
+                                onPress={() => { setScanTarget('sku'); setShowScanner(true); }}
                             >
                                 <Ionicons name="scan" size={20} color={colors.white} />
                             </TouchableOpacity>
@@ -247,7 +330,13 @@ export default function ItemFormScreen({ navigation, route }) {
                     <BarcodeScannerModal
                         visible={showScanner}
                         onClose={() => setShowScanner(false)}
-                        onScan={(code) => setSku(code)}
+                        onScan={(code) => {
+                            if (scanTarget === 'customId') {
+                                setCustomId(code);
+                            } else {
+                                setSku(code);
+                            }
+                        }}
                     />
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -318,5 +407,44 @@ const getStyles = (colors) => StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: colors.accent,
+    },
+    suggestionsBox: {
+        marginTop: 8,
+        backgroundColor: colors.surface,
+        borderRadius: BorderRadius.md,
+        borderWidth: 1,
+        borderColor: (colors.warning || '#f59e0b') + '44',
+        overflow: 'hidden',
+    },
+    suggestionsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        backgroundColor: (colors.warning || '#f59e0b') + '15',
+        gap: 6,
+    },
+    suggestionsTitle: {
+        flex: 1,
+        fontSize: FontSize.sm,
+        fontWeight: '600',
+        color: colors.warning || '#f59e0b',
+    },
+    suggestionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: colors.border + '44',
+    },
+    suggestionName: {
+        fontSize: FontSize.md,
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    suggestionInfo: {
+        fontSize: FontSize.xs,
+        color: colors.textSecondary,
+        marginTop: 2,
     },
 });

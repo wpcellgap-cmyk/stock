@@ -168,8 +168,9 @@ export async function getItemById(id) {
 
 export async function findItemByName(name, categoryId = null, excludeId = null) {
     const database = await getDatabase();
-    let query = 'SELECT * FROM items WHERE LOWER(name) = LOWER(?)';
-    const params = [name];
+    const s = name.toLowerCase();
+    let query = 'SELECT * FROM items WHERE (LOWER(name) LIKE ? OR ? LIKE \'%\' || LOWER(name) || \'%\')';
+    const params = [`%${s}%`, s];
     if (categoryId) {
         query += ' AND category_id = ?';
         params.push(categoryId);

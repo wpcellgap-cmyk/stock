@@ -1,27 +1,65 @@
 // src/components/BarcodeScannerModal.js
-import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../ThemeContext';
 import { FontSize, Spacing } from '../theme';
 
+const SCAN_FRAME_SIZE = 250;
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
 export default function BarcodeScannerModal({ visible, onClose, onScan }) {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
+    const [scannedData, setScannedData] = useState('');
     const { colors } = useTheme();
 
     useEffect(() => {
         if (visible) {
             setScanned(false);
+            setScannedData('');
         }
     }, [visible]);
 
-    const handleBarCodeScanned = ({ type, data }) => {
+    const isInsideScanFrame = (bounds) => {
+        if (!bounds || !bounds.origin) return true; // fallback: accept if no bounds info
+
+        const frameLeft = (SCREEN_W - SCAN_FRAME_SIZE) / 2;
+        const frameTop = (SCREEN_H - SCAN_FRAME_SIZE) / 2;
+        const frameRight = frameLeft + SCAN_FRAME_SIZE;
+        const frameBottom = frameTop + SCAN_FRAME_SIZE;
+
+        // Center point of the barcode
+        const barcodeX = bounds.origin.x + (bounds.size?.width || 0) / 2;
+        const barcodeY = bounds.origin.y + (bounds.size?.height || 0) / 2;
+
+        // Allow some margin (30px) for better UX
+        const margin = 30;
+        return (
+            barcodeX >= frameLeft - margin &&
+            barcodeX <= frameRight + margin &&
+            barcodeY >= frameTop - margin &&
+            barcodeY <= frameBottom + margin
+        );
+    };
+
+    const handleBarCodeScanned = ({ type, data, bounds }) => {
         if (scanned) return;
+        if (!isInsideScanFrame(bounds)) return; // ignore scans outside the frame
+
         setScanned(true);
-        onScan(data);
-        setTimeout(() => onClose(), 300);
+        setScannedData(data);
+    };
+
+    const handleUse = () => {
+        onScan(scannedData);
+        onClose();
+    };
+
+    const handleScanAgain = () => {
+        setScanned(false);
+        setScannedData('');
     };
 
     if (!visible) return null;
@@ -75,14 +113,29 @@ export default function BarcodeScannerModal({ visible, onClose, onScan }) {
                     </View>
 
                     <View style={styles.scanArea}>
-                        <View style={[styles.scanFrame, { borderColor: colors.accent }]} />
-                        <Text style={styles.instruction}>Arahkan kamera ke barcode/QR code</Text>
+                        <View style={[styles.scanFrame, { borderColor: scanned ? colors.success : colors.accent }]} />
+                        {!scanned && (
+                            <Text style={styles.instruction}>Arahkan barcode ke dalam kotak</Text>
+                        )}
                     </View>
 
                     {scanned && (
-                        <View style={styles.scannedBadge}>
-                            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                            <Text style={styles.scannedText}>Berhasil scan!</Text>
+                        <View style={styles.resultContainer}>
+                            <View style={styles.resultCard}>
+                                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                                <Text style={styles.resultLabel}>Hasil Scan:</Text>
+                                <Text style={styles.resultData} numberOfLines={2}>{scannedData}</Text>
+                                <View style={styles.resultButtons}>
+                                    <TouchableOpacity style={styles.scanAgainBtn} onPress={handleScanAgain}>
+                                        <Ionicons name="refresh" size={18} color={colors.white} />
+                                        <Text style={styles.scanAgainText}>Scan Ulang</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.useBtn, { backgroundColor: colors.success }]} onPress={handleUse}>
+                                        <Ionicons name="checkmark" size={18} color={colors.white} />
+                                        <Text style={styles.useBtnText}>Gunakan</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         </View>
                     )}
                 </View>
@@ -156,8 +209,8 @@ const getStyles = (colors) => StyleSheet.create({
         alignItems: 'center',
     },
     scanFrame: {
-        width: 250,
-        height: 250,
+        width: SCAN_FRAME_SIZE,
+        height: SCAN_FRAME_SIZE,
         borderWidth: 3,
         borderRadius: 16,
         backgroundColor: 'transparent',
@@ -172,20 +225,58 @@ const getStyles = (colors) => StyleSheet.create({
         paddingVertical: Spacing.sm,
         borderRadius: 8,
     },
-    scannedBadge: {
+    resultContainer: {
+        paddingHorizontal: Spacing.lg,
+        paddingBottom: 60,
+    },
+    resultCard: {
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        borderRadius: 16,
+        padding: Spacing.xl,
+        alignItems: 'center',
+    },
+    resultLabel: {
+        color: '#aaa',
+        fontSize: FontSize.sm,
+        marginTop: 8,
+    },
+    resultData: {
+        color: '#ffffff',
+        fontSize: FontSize.xl,
+        fontWeight: '700',
+        marginTop: 4,
+        textAlign: 'center',
+    },
+    resultButtons: {
+        flexDirection: 'row',
+        marginTop: Spacing.lg,
+        gap: 12,
+    },
+    scanAgainBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,200,83,0.9)',
+        backgroundColor: 'rgba(255,255,255,0.2)',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 24,
-        alignSelf: 'center',
-        marginBottom: 100,
+        gap: 6,
     },
-    scannedText: {
+    scanAgainText: {
+        color: '#ffffff',
+        fontSize: FontSize.md,
+        fontWeight: '600',
+    },
+    useBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 24,
+        gap: 6,
+    },
+    useBtnText: {
         color: '#ffffff',
         fontSize: FontSize.md,
         fontWeight: '700',
-        marginLeft: 8,
     },
 });

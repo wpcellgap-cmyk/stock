@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { getItems, addStockToItem, logActivity, getDatabase } from '../database';
 import { exportTransactionHistoryCSV, exportExcel } from '../importExport';
 import { useTheme } from '../ThemeContext';
@@ -21,6 +22,7 @@ export default function TransactionScreen({ navigation }) {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
+    const [showScanner, setShowScanner] = useState(false);
 
     // Shopping List State
     const [shoppingList, setShoppingList] = useState([]);
@@ -56,6 +58,21 @@ export default function TransactionScreen({ navigation }) {
         setSelectedItem(item);
         setSearch(item.name);
         setShowDropdown(false);
+    };
+
+    const handleScanResult = async (code) => {
+        // Cari item berdasarkan barcode (sku atau custom_id)
+        const results = await getItems(code, 'all');
+        if (results.length === 1) {
+            // Tepat 1 item ditemukan, langsung pilih
+            handleSelect(results[0]);
+        } else if (results.length > 1) {
+            // Lebih dari 1 item, tampilkan dropdown dengan hasil
+            setSearch(code);
+            setShowDropdown(true);
+        } else {
+            Alert.alert('Tidak Ditemukan', `Tidak ada barang dengan kode "${code}"`);
+        }
     };
 
     const handleSave = async () => {
@@ -233,15 +250,23 @@ export default function TransactionScreen({ navigation }) {
                     {/* Search Dropdown */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Cari Barang</Text>
-                        <TouchableOpacity
-                            style={styles.input}
-                            onPress={() => setShowDropdown(!showDropdown)}
-                        >
-                            <Text style={{ color: selectedItem ? colors.textPrimary : colors.textMuted }}>
-                                {selectedItem ? selectedItem.name : 'Pilih barang...'}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
-                        </TouchableOpacity>
+                        <View style={styles.inputWithScan}>
+                            <TouchableOpacity
+                                style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRightWidth: 0 }]}
+                                onPress={() => setShowDropdown(!showDropdown)}
+                            >
+                                <Text style={{ color: selectedItem ? colors.textPrimary : colors.textMuted }}>
+                                    {selectedItem ? selectedItem.name : 'Pilih barang...'}
+                                </Text>
+                                <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.scanBtn}
+                                onPress={() => setShowScanner(true)}
+                            >
+                                <Ionicons name="scan" size={22} color={colors.white} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {showDropdown && (
@@ -355,6 +380,11 @@ export default function TransactionScreen({ navigation }) {
                     </View>
                 )}
 
+                <BarcodeScannerModal
+                    visible={showScanner}
+                    onClose={() => setShowScanner(false)}
+                    onScan={handleScanResult}
+                />
             </View>
         </View>
     );
@@ -488,6 +518,19 @@ const getStyles = (colors, type) => StyleSheet.create({
     infoText: {
         color: colors.textSecondary,
         fontSize: FontSize.sm,
+    },
+    inputWithScan: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    scanBtn: {
+        backgroundColor: type === 'out' ? colors.danger : type === 'shopping' ? colors.info : colors.success,
+        height: 50,
+        paddingHorizontal: 16,
+        borderTopRightRadius: BorderRadius.md,
+        borderBottomRightRadius: BorderRadius.md,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     saveBtn: {
         paddingVertical: 16,

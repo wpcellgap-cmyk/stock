@@ -6,50 +6,82 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../ThemeContext';
 import { FontSize, Spacing } from '../theme';
 
-const SCAN_FRAME_SIZE = 250;
+const SCAN_FRAME_SIZE = 260;
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+// Posisi kotak scan di tengah layar
+const FRAME_TOP = (SCREEN_H - SCAN_FRAME_SIZE) / 2;
+const FRAME_LEFT = (SCREEN_W - SCAN_FRAME_SIZE) / 2;
 
 export default function BarcodeScannerModal({ visible, onClose, onScan }) {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
     const [scannedData, setScannedData] = useState('');
+    const [ready, setReady] = useState(false);
+    const scanCountRef = useRef({ data: '', count: 0 });
     const { colors } = useTheme();
 
     useEffect(() => {
         if (visible) {
             setScanned(false);
             setScannedData('');
+            setReady(false);
+            scanCountRef.current = { data: '', count: 0 };
+            // Delay 3 detik sebelum scan aktif
+            const timer = setTimeout(() => setReady(true), 3000);
+            return () => clearTimeout(timer);
         }
     }, [visible]);
 
-    const isInsideScanFrame = (bounds) => {
-        if (!bounds || !bounds.origin) return true; // fallback: accept if no bounds info
+    const handleBarCodeScanned = ({ type, data, bounds, cornerPoints }) => {
+        if (scanned || !ready) return;
 
-        const frameLeft = (SCREEN_W - SCAN_FRAME_SIZE) / 2;
-        const frameTop = (SCREEN_H - SCAN_FRAME_SIZE) / 2;
-        const frameRight = frameLeft + SCAN_FRAME_SIZE;
-        const frameBottom = frameTop + SCAN_FRAME_SIZE;
+        // Filter: hanya terima barcode yang berada di dalam kotak scan
+        if (cornerPoints && cornerPoints.length > 0) {
+            // Hitung center dari cornerPoints
+            let cx = 0, cy = 0;
+            for (const p of cornerPoints) {
+                cx += p.x;
+                cy += p.y;
+            }
+            cx /= cornerPoints.length;
+            cy /= cornerPoints.length;
 
-        // Center point of the barcode
-        const barcodeX = bounds.origin.x + (bounds.size?.width || 0) / 2;
-        const barcodeY = bounds.origin.y + (bounds.size?.height || 0) / 2;
+            const margin = 50;
+            const inFrame = (
+                cx >= FRAME_LEFT - margin &&
+                cx <= FRAME_LEFT + SCAN_FRAME_SIZE + margin &&
+                cy >= FRAME_TOP - margin &&
+                cy <= FRAME_TOP + SCAN_FRAME_SIZE + margin
+            );
+            if (!inFrame) return;
+        } else if (bounds && bounds.origin) {
+            // Fallback ke bounds jika cornerPoints tidak tersedia
+            const bx = bounds.origin.x + (bounds.size?.width || 0) / 2;
+            const by = bounds.origin.y + (bounds.size?.height || 0) / 2;
 
-        // Allow some margin (30px) for better UX
-        const margin = 30;
-        return (
-            barcodeX >= frameLeft - margin &&
-            barcodeX <= frameRight + margin &&
-            barcodeY >= frameTop - margin &&
-            barcodeY <= frameBottom + margin
-        );
-    };
+            const margin = 50;
+            const inFrame = (
+                bx >= FRAME_LEFT - margin &&
+                bx <= FRAME_LEFT + SCAN_FRAME_SIZE + margin &&
+                by >= FRAME_TOP - margin &&
+                by <= FRAME_TOP + SCAN_FRAME_SIZE + margin
+            );
+            if (!inFrame) return;
+        }
+        // Jika tidak ada bounds maupun cornerPoints, tetap terima
 
-    const handleBarCodeScanned = ({ type, data, bounds }) => {
-        if (scanned) return;
-        if (!isInsideScanFrame(bounds)) return; // ignore scans outside the frame
+        // Barcode harus terdeteksi 3x berturut-turut sebelum diterima
+        if (scanCountRef.current.data === data) {
+            scanCountRef.current.count += 1;
+        } else {
+            scanCountRef.current = { data, count: 1 };
+        }
 
-        setScanned(true);
-        setScannedData(data);
+        if (scanCountRef.current.count >= 3) {
+            setScanned(true);
+            setScannedData(data);
+        }
     };
 
     const handleUse = () => {
@@ -60,6 +92,7 @@ export default function BarcodeScannerModal({ visible, onClose, onScan }) {
     const handleScanAgain = () => {
         setScanned(false);
         setScannedData('');
+        scanCountRef.current = { data: '', count: 0 };
     };
 
     if (!visible) return null;
@@ -96,26 +129,51 @@ export default function BarcodeScannerModal({ visible, onClose, onScan }) {
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
             <View style={styles.scannerContainer}>
+                {/* Kamera full-screen di belakang */}
                 <CameraView
-                    style={styles.camera}
+                    style={StyleSheet.absoluteFill}
                     facing="back"
                     barcodeScannerSettings={{
-                        barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
+                        barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'code93', 'upc_a', 'upc_e', 'codabar', 'itf14', 'datamatrix', 'pdf417'],
                     }}
                     onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                 />
 
-                <View style={styles.overlay}>
+                {/* Overlay gelap dengan lubang transparan di tengah */}
+                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    {/* Atas */}
+                    <View style={styles.overlayDark} />
+
+                    {/* Baris tengah: kiri + frame + kanan */}
+                    <View style={styles.middleRow}>
+                        <View style={styles.overlayDarkSide} />
+                        <View style={[styles.scanFrame, { borderColor: scanned ? colors.success : ready ? colors.accent : '#ffffff55' }]}>
+                            {/* Corner decorations */}
+                            <View style={[styles.corner, styles.cornerTL, { borderColor: scanned ? colors.success : ready ? colors.accent : '#ffffff55' }]} />
+                            <View style={[styles.corner, styles.cornerTR, { borderColor: scanned ? colors.success : ready ? colors.accent : '#ffffff55' }]} />
+                            <View style={[styles.corner, styles.cornerBL, { borderColor: scanned ? colors.success : ready ? colors.accent : '#ffffff55' }]} />
+                            <View style={[styles.corner, styles.cornerBR, { borderColor: scanned ? colors.success : ready ? colors.accent : '#ffffff55' }]} />
+                        </View>
+                        <View style={styles.overlayDarkSide} />
+                    </View>
+
+                    {/* Bawah */}
+                    <View style={styles.overlayDark} />
+                </View>
+
+                {/* Header & instruksi di atas overlay */}
+                <View style={styles.uiLayer} pointerEvents="box-none">
                     <View style={styles.header}>
                         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
                             <Ionicons name="close" size={28} color="#ffffff" />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.scanArea}>
-                        <View style={[styles.scanFrame, { borderColor: scanned ? colors.success : colors.accent }]} />
+                    <View style={styles.instructionArea}>
                         {!scanned && (
-                            <Text style={styles.instruction}>Arahkan barcode ke dalam kotak</Text>
+                            <Text style={styles.instruction}>
+                                {ready ? 'Arahkan barcode ke dalam kotak' : 'Mempersiapkan kamera...'}
+                            </Text>
                         )}
                     </View>
 
@@ -182,10 +240,66 @@ const getStyles = (colors) => StyleSheet.create({
         flex: 1,
         backgroundColor: '#000000',
     },
-    camera: {
+    // Overlay gelap di atas dan bawah kotak
+    overlayDark: {
         flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
     },
-    overlay: {
+    // Baris tengah (horizontal)
+    middleRow: {
+        flexDirection: 'row',
+        height: SCAN_FRAME_SIZE,
+    },
+    // Overlay gelap di kiri dan kanan kotak
+    overlayDarkSide: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+    },
+    // Kotak scan (lubang transparan)
+    scanFrame: {
+        width: SCAN_FRAME_SIZE,
+        height: SCAN_FRAME_SIZE,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        position: 'relative',
+    },
+    // Corner decorations
+    corner: {
+        position: 'absolute',
+        width: 30,
+        height: 30,
+        borderColor: colors.accent,
+    },
+    cornerTL: {
+        top: -1,
+        left: -1,
+        borderTopWidth: 4,
+        borderLeftWidth: 4,
+        borderTopLeftRadius: 12,
+    },
+    cornerTR: {
+        top: -1,
+        right: -1,
+        borderTopWidth: 4,
+        borderRightWidth: 4,
+        borderTopRightRadius: 12,
+    },
+    cornerBL: {
+        bottom: -1,
+        left: -1,
+        borderBottomWidth: 4,
+        borderLeftWidth: 4,
+        borderBottomLeftRadius: 12,
+    },
+    cornerBR: {
+        bottom: -1,
+        right: -1,
+        borderBottomWidth: 4,
+        borderRightWidth: 4,
+        borderBottomRightRadius: 12,
+    },
+    // UI Layer di atas semua
+    uiLayer: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'space-between',
     },
@@ -203,22 +317,13 @@ const getStyles = (colors) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    scanArea: {
-        flex: 1,
-        justifyContent: 'center',
+    instructionArea: {
         alignItems: 'center',
-    },
-    scanFrame: {
-        width: SCAN_FRAME_SIZE,
-        height: SCAN_FRAME_SIZE,
-        borderWidth: 3,
-        borderRadius: 16,
-        backgroundColor: 'transparent',
+        paddingBottom: 20,
     },
     instruction: {
         color: '#ffffff',
         fontSize: FontSize.md,
-        marginTop: Spacing.xl,
         textAlign: 'center',
         backgroundColor: 'rgba(0,0,0,0.6)',
         paddingHorizontal: Spacing.lg,
